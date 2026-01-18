@@ -5,7 +5,11 @@ import { cn } from '@/lib/utils';
 const WINDOW_SIZE = 400;
 const CURSOR_OFFSET = 200;
 
-export default function TextReader() {
+interface TextReaderProps {
+  fontSize?: number;
+}
+
+export default function TextReader({ fontSize = 1 }: TextReaderProps) {
   const { text, positionIndex, typedChars } = useTypingStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,9 +42,9 @@ export default function TextReader() {
             className={cn(
               'inline-block mx-1',
               {
-                'bg-green-500/30 text-green-600 dark:text-green-400': status === 'correct',
-                'bg-red-500/30 text-red-600 dark:text-red-400': status === 'incorrect',
-                'bg-primary/20 text-primary border-2 border-primary animate-pulse': isCurrent,
+                'text-green-600 dark:text-green-400': status === 'correct',
+                'text-red-600 dark:text-red-400': status === 'incorrect',
+                'text-primary border-2 border-primary animate-pulse': isCurrent,
                 'text-muted-foreground': !isPast && !isCurrent,
               }
             )}
@@ -61,8 +65,8 @@ export default function TextReader() {
           className={cn(
             'inline-block',
             {
-              'bg-green-500/30 text-green-600 dark:text-green-400': status === 'correct',
-              'bg-red-500/30 text-red-600 dark:text-red-400': status === 'incorrect',
+              'text-green-600 dark:text-green-400': status === 'correct',
+              'text-red-600 dark:text-red-400': status === 'incorrect',
               'border-b-2 border-primary animate-pulse': isCurrent,
               'text-muted-foreground': !isPast && !isCurrent,
             }
@@ -81,8 +85,8 @@ export default function TextReader() {
         className={cn(
           'inline-block',
           {
-            'bg-green-500/30 text-green-600 dark:text-green-400': status === 'correct',
-            'bg-red-500/30 text-red-600 dark:text-red-400': status === 'incorrect',
+            'text-green-600 dark:text-green-400': status === 'correct',
+            'text-red-600 dark:text-red-400': status === 'incorrect',
             'border-b-2 border-primary animate-pulse': isCurrent,
             'text-muted-foreground': !isPast && !isCurrent,
           }
@@ -97,7 +101,11 @@ export default function TextReader() {
     <div
       ref={containerRef}
       className="w-full h-full overflow-auto p-2 bg-card rounded-lg border"
-      style={{ fontFamily: 'monospace', fontSize: '1rem', lineHeight: '1.5' }}
+      style={{ 
+        fontFamily: 'monospace', 
+        fontSize: `${fontSize}rem`, 
+        lineHeight: '1.5' 
+      }}
     >
       {visibleText.split('').map((char, index) => renderChar(char, index))}
     </div>

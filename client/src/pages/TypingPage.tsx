@@ -9,7 +9,7 @@ import TextReader from '../components/Reader/TextReader';
 import VirtualKeyboard from '../components/Keyboard/VirtualKeyboard';
 import StatsPanel from '../components/Stats/StatsPanel';
 import Button from '../components/ui/Button';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Minus, Plus } from 'lucide-react';
 
 export default function TypingPage() {
   const { bookId } = useParams<{ bookId: string }>();
@@ -31,6 +31,7 @@ export default function TypingPage() {
 
   const [isFocused, setIsFocused] = useState(false);
   const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
+  const [fontSize, setFontSize] = useState(1);
 
   const syncWithRemote = async (bookId: string) => {
     try {
@@ -301,6 +302,27 @@ export default function TypingPage() {
 
           {/* Text Reader in the middle - reduced height */}
           <div className="h-[200px] flex-shrink-0">
+            {/* Font size controls */}
+            <div className="flex items-center justify-end gap-2 mb-2">
+              <span className="text-xs text-muted-foreground">Font Size:</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFontSize(Math.max(0.75, fontSize - 0.1))}
+                className="h-7 w-7 p-0"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium w-12 text-center">{fontSize.toFixed(1)}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFontSize(Math.min(2, fontSize + 0.1))}
+                className="h-7 w-7 p-0"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
             <div
               tabIndex={0}
               onKeyDown={handleKeyDown}
@@ -308,7 +330,7 @@ export default function TypingPage() {
               onBlur={handleBlur}
               className="outline-none h-full"
             >
-              <TextReader />
+              <TextReader fontSize={fontSize} />
             </div>
             {!isFocused && (
               <div className="mt-1 text-center text-xs text-muted-foreground">
