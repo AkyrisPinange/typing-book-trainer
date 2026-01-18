@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { LocalProgress, saveLocalProgress, getLocalProgress } from '../lib/storage';
+import { LocalProgress, saveLocalProgress } from '../lib/storage';
 import { calculateWPM, calculateAccuracy } from '../lib/wpm';
 
 export interface TypingState {

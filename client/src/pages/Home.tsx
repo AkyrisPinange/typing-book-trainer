@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cleanGutenbergText, generateBookId } from '@/lib/gutenbergCleaner';
 import { saveBookInfo, getAllBookInfo, getAllLocalProgress, deleteBookInfo, deleteLocalProgress } from '@/lib/storage';
-import { getAllProgress as getRemoteProgress, saveProgress, saveBook, getBook, deleteBook as deleteRemoteBook } from '@/lib/api';
+import { getAllProgress as getRemoteProgress, saveBook, deleteBook as deleteRemoteBook } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useTypingStore } from '@/store/useTypingStore';
 import Button from '../components/ui/Button';
