@@ -1,4 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Ensure VITE_API_URL ends with /api or add it
+const getApiBase = () => {
+  const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  return url.endsWith('/api') ? url : `${url}/api`;
+};
+const API_BASE = getApiBase();
 
 export interface ApiProgress {
   bookId: string;
