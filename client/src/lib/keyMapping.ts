@@ -59,17 +59,19 @@ function findNextChar(text: string, position: number): { char: string; position:
 
 export function getKeyInfo(char: string, text?: string, position?: number): KeyInfo {
   // Skip newlines - find the next actual character to type
+  // This is used for the virtual keyboard display to show what key to press next
   if (char === '\n' && text && position !== undefined) {
     const next = findNextChar(text, position);
     if (next) {
       // Recursively get info for the next non-newline character
+      // This will correctly show space if next char is space, or letter if next char is letter
       return getKeyInfo(next.char, text, next.position);
     }
     // If no next character found, return a placeholder
     return { key: 'Enter', needsShift: false, needsCapsLock: false, display: 'Enter' };
   }
 
-  // Handle space
+  // Handle space - spaces must be typed, they are not auto-advanced
   if (char === ' ') {
     return { key: ' ', needsShift: false, needsCapsLock: false, display: 'Space' };
   }

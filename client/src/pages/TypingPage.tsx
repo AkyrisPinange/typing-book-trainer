@@ -247,18 +247,26 @@ export default function TypingPage() {
     }
 
     // Auto-advance on newlines: accept any key (except Backspace) to skip newline
+    // But only advance newlines - spaces and other characters must be typed normally
     let currentIndex = positionIndex;
     while (currentIndex < text.length && text[currentIndex] === '\n') {
       // Mark newline as correct and advance automatically
       handleKeyPress('\n', '\n');
+      // Get the updated position from store after advancing
       currentIndex = useTypingStore.getState().positionIndex;
       if (currentIndex >= text.length) return;
     }
 
-    const expectedChar = text[currentIndex];
-    const keyInfo = getKeyInfo(expectedChar, text, currentIndex);
+    // After advancing newlines, get the actual character at the current position
+    // This could be a space, letter, or any other character - it must be typed
+    // Use the most up-to-date position from store to ensure synchronization
+    const finalPositionIndex = useTypingStore.getState().positionIndex;
+    const expectedChar = text[finalPositionIndex];
+    
+    // Get key info for the expected character (this will correctly handle spaces)
+    const keyInfo = getKeyInfo(expectedChar, text, finalPositionIndex);
 
-    // Process the key press
+    // Process the key press for the expected character
     const matchedKey = processKeyPress(e.key, expectedChar, keyInfo, e);
     
     if (matchedKey === null) {
