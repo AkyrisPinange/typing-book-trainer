@@ -286,37 +286,38 @@ export default function TypingPage() {
       pressedKey: e.key
     });
 
-    // Skip multiple consecutive newlines (but not the first one if followed by letter)
+    // Handle newlines: skip multiple consecutive newlines, but if followed by letter, treat as space
     while (currentIndex < text.length && text[currentIndex] === '\n') {
-      // Check if this newline is followed by a letter (needs space)
-      const nextCharIndex = currentIndex + 1;
-      let foundNonNewline = false;
-      for (let i = nextCharIndex; i < text.length; i++) {
-        if (text[i] !== '\n') {
-          foundNonNewline = true;
-          // If followed by letter, treat as space - don't skip
-          if (/[a-zA-Z]/.test(text[i])) {
-            console.log('[DEBUG] Newline at', currentIndex, 'followed by letter, treating as space');
-            break; // Don't skip, treat as space
-          }
-          // If followed by non-letter, skip this newline
-          console.log('[DEBUG] Auto-advancing newline at index:', currentIndex, '(not followed by letter)');
+      // Find the next non-newline character
+      let nextCharIndex = currentIndex + 1;
+      while (nextCharIndex < text.length && text[nextCharIndex] === '\n') {
+        nextCharIndex++;
+      }
+      
+      if (nextCharIndex >= text.length) {
+        // Only newlines remaining until end - skip them all
+        console.log('[DEBUG] Only newlines remaining, skipping all');
+        while (currentIndex < text.length && text[currentIndex] === '\n') {
           handleKeyPress('\n', '\n');
           currentIndex = useTypingStore.getState().positionIndex;
           if (currentIndex >= text.length) return;
-          break;
         }
-      }
-      if (!foundNonNewline) {
-        // Only newlines remaining, skip them
-        console.log('[DEBUG] Auto-advancing newline at index:', currentIndex, '(only newlines remaining)');
-        handleKeyPress('\n', '\n');
-        currentIndex = useTypingStore.getState().positionIndex;
-        if (currentIndex >= text.length) return;
-      } else if (/[a-zA-Z]/.test(text[currentIndex + 1] || '')) {
-        // Newline followed by letter - treat as space, don't skip
         break;
       }
+      
+      const nextChar = text[nextCharIndex];
+      // If followed by letter, treat as space - don't skip, exit loop
+      if (/[a-zA-Z]/.test(nextChar)) {
+        console.log('[DEBUG] Newline at', currentIndex, 'followed by letter, treating as space');
+        break; // Exit while loop, treat as space
+      }
+      
+      // Not followed by letter - skip this newline and continue
+      console.log('[DEBUG] Auto-advancing newline at index:', currentIndex, '(not followed by letter)');
+      handleKeyPress('\n', '\n');
+      currentIndex = useTypingStore.getState().positionIndex;
+      if (currentIndex >= text.length) return;
+      // Continue while loop to check next character
     }
 
     const expectedChar = text[currentIndex];
