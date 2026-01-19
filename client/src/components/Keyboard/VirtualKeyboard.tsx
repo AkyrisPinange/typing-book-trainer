@@ -15,30 +15,30 @@ export default function VirtualKeyboard() {
 
   const nextKeyInfo = useMemo(() => {
     if (positionIndex >= text.length) return null;
-    return getKeyInfo(text[positionIndex]);
+    return getKeyInfo(text[positionIndex], text, positionIndex);
   }, [text, positionIndex]);
 
   const highlightedKey = nextKeyInfo?.key.toLowerCase();
   const needsShift = nextKeyInfo?.needsShift || false;
+  const needsCapsLock = nextKeyInfo?.needsCapsLock || false;
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      {nextKeyInfo && (
-        <div className="text-base font-semibold text-muted-foreground">
-          Next: {getKeyDisplay(nextKeyInfo)}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        {/* Shift indicator */}
-        {needsShift && (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col gap-2 w-full">
+        {nextKeyInfo && (
+          <div className="text-sm font-semibold text-muted-foreground text-center mb-1">
+            Next: {getKeyDisplay(nextKeyInfo)}
+          </div>
+        )}
+        {/* Shift/Caps Lock indicator */}
+        {(needsShift || needsCapsLock) && (
           <div className="flex justify-center mb-1">
             <div className={cn(
               'px-4 py-2 rounded-md font-semibold text-sm',
               'bg-primary text-primary-foreground',
               'border-2 border-primary-foreground'
             )}>
-              Shift
+              {needsCapsLock ? 'Caps Lock' : 'Shift'}
             </div>
           </div>
         )}
@@ -68,11 +68,23 @@ export default function VirtualKeyboard() {
             </div>
           ))}
 
-          {/* Bottom row with Space and special keys */}
+          {/* Bottom row with Caps Lock, Space and special keys */}
           <div className="flex justify-center gap-1.5 mt-2">
             <div
               className={cn(
-                'min-w-[8rem] h-10 flex items-center justify-center',
+                'min-w-[5rem] h-10 flex items-center justify-center',
+                'rounded-md font-semibold text-sm',
+                'border-2 transition-all',
+                needsCapsLock
+                  ? 'bg-primary text-primary-foreground border-primary-foreground scale-110'
+                  : 'bg-background border-border text-foreground'
+              )}
+            >
+              Caps Lock
+            </div>
+            <div
+              className={cn(
+                'min-w-[12rem] h-10 flex items-center justify-center',
                 'rounded-md font-semibold text-sm',
                 'border-2 transition-all',
                 highlightedKey === ' '
@@ -84,19 +96,7 @@ export default function VirtualKeyboard() {
             </div>
             <div
               className={cn(
-                'min-w-[4rem] h-10 flex items-center justify-center',
-                'rounded-md font-semibold text-sm',
-                'border-2 transition-all',
-                highlightedKey === 'enter'
-                  ? 'bg-primary text-primary-foreground border-primary-foreground scale-110'
-                  : 'bg-background border-border text-foreground'
-              )}
-            >
-              Enter
-            </div>
-            <div
-              className={cn(
-                'min-w-[4rem] h-10 flex items-center justify-center',
+                'min-w-[5rem] h-10 flex items-center justify-center',
                 'rounded-md font-semibold text-sm',
                 'border-2 transition-all',
                 'bg-background border-border text-foreground'

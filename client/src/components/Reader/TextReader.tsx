@@ -34,23 +34,10 @@ export default function TextReader({ fontSize = 1 }: TextReaderProps) {
     const isCurrent = globalIndex === positionIndex;
     const isPast = globalIndex < positionIndex;
 
-    // Handle newline character - show ↵ and break line
+    // Handle newline character - just break line (no visible symbol)
     if (char === '\n') {
       return (
         <span key={globalIndex} data-index={globalIndex}>
-          <span
-            className={cn(
-              'inline-block mx-1',
-              {
-                'text-green-600 dark:text-green-400': status === 'correct',
-                'text-red-600 dark:text-red-400': status === 'incorrect',
-                'text-primary border-2 border-primary animate-pulse': isCurrent,
-                'text-muted-foreground': !isPast && !isCurrent,
-              }
-            )}
-          >
-            ↵
-          </span>
           <br />
         </span>
       );
@@ -100,14 +87,16 @@ export default function TextReader({ fontSize = 1 }: TextReaderProps) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-auto p-2 bg-card rounded-lg border"
+      className="w-full h-full overflow-auto p-2 bg-card rounded-lg border flex items-center justify-center"
       style={{ 
         fontFamily: 'monospace', 
         fontSize: `${fontSize}rem`, 
         lineHeight: '1.5' 
       }}
     >
-      {visibleText.split('').map((char, index) => renderChar(char, index))}
+      <div className="text-center">
+        {visibleText.split('').map((char, index) => renderChar(char, index))}
+      </div>
     </div>
   );
 }

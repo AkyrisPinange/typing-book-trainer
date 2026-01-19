@@ -4,7 +4,7 @@ import { useTypingStore } from '@/store/useTypingStore';
 import { getLocalProgress, saveLocalProgress } from '@/lib/storage';
 import { getProgress as getRemoteProgress, saveProgress as saveRemoteProgress, getBook } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
-import { getKeyInfo } from '@/lib/keyMapping';
+import { getKeyInfo, UPPER_CASE } from '@/lib/keyMapping';
 import TextReader from '../components/Reader/TextReader';
 import VirtualKeyboard from '../components/Keyboard/VirtualKeyboard';
 import StatsPanel from '../components/Stats/StatsPanel';
@@ -177,11 +177,56 @@ export default function TypingPage() {
     };
   }, []);
 
+  // Helper function to process a key press for a given expected character
+  const processKeyPress = (pressedKey: string, expectedChar: string, keyInfo: ReturnType<typeof getKeyInfo>, e: React.KeyboardEvent): string | null => {
+    // Handle space
+    if (expectedChar === ' ' && pressedKey === ' ') {
+      return ' ';
+    }
+    
+    // Handle uppercase letters and shift characters
+    if (keyInfo.needsCapsLock || keyInfo.needsShift) {
+      if (UPPER_CASE.test(expectedChar)) {
+        const isCapsLockOn = e.getModifierState('CapsLock');
+        const baseKeyMatches = pressedKey.toLowerCase() === keyInfo.key.toLowerCase();
+        
+        if (keyInfo.needsCapsLock) {
+          if (isCapsLockOn && pressedKey === expectedChar) {
+            return expectedChar;
+          } else if (isCapsLockOn && baseKeyMatches) {
+            return expectedChar;
+          } else if (e.shiftKey && baseKeyMatches) {
+            return expectedChar;
+          }
+        } else {
+          if (e.shiftKey && baseKeyMatches) {
+            return expectedChar;
+          } else if (isCapsLockOn && (pressedKey === expectedChar || baseKeyMatches)) {
+            return expectedChar;
+          }
+        }
+      } else if (keyInfo.needsShift) {
+        if (e.shiftKey && pressedKey.toLowerCase() === keyInfo.key.toLowerCase()) {
+          return expectedChar;
+        }
+      }
+    } else {
+      // Regular characters
+      if (/[a-z]/i.test(expectedChar) && pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
+        return expectedChar;
+      } else if (pressedKey === expectedChar) {
+        return expectedChar;
+      }
+    }
+    
+    return null; // Key doesn't match
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isFocused || !text || positionIndex >= text.length) return;
 
-    // Ignore modifier keys when pressed alone (Shift, Control, Alt, Meta)
-    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
+    // Ignore modifier keys when pressed alone (Shift, Control, Alt, Meta, CapsLock)
+    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'CapsLock') {
       return;
     }
 
@@ -201,38 +246,28 @@ export default function TypingPage() {
       return;
     }
 
-    const expectedChar = text[positionIndex];
-    const keyInfo = getKeyInfo(expectedChar);
-
-    // Map the pressed key to what we expect
-    let pressedKey = e.key;
-
-    // Handle special cases
-    if (expectedChar === '\n' && e.key === 'Enter') {
-      pressedKey = '\n';
-    } else if (expectedChar === ' ' && e.key === ' ') {
-      pressedKey = ' ';
-    } else if (keyInfo.needsShift) {
-      // For shift characters, check if shift was pressed and the base key matches
-      if (e.shiftKey && pressedKey.toLowerCase() === keyInfo.key.toLowerCase()) {
-        pressedKey = expectedChar;
-      } else {
-        // Wrong key
-        handleKeyPress(pressedKey, expectedChar);
-        return;
-      }
-    } else {
-      // For regular characters, compare case-insensitively for letters
-      if (/[a-z]/i.test(expectedChar) && pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
-        pressedKey = expectedChar;
-      } else if (pressedKey !== expectedChar) {
-        // Wrong key
-        handleKeyPress(pressedKey, expectedChar);
-        return;
-      }
+    // Auto-advance on newlines: accept any key (except Backspace) to skip newline
+    let currentIndex = positionIndex;
+    while (currentIndex < text.length && text[currentIndex] === '\n') {
+      // Mark newline as correct and advance automatically
+      handleKeyPress('\n', '\n');
+      currentIndex = useTypingStore.getState().positionIndex;
+      if (currentIndex >= text.length) return;
     }
 
-    handleKeyPress(pressedKey, expectedChar);
+    const expectedChar = text[currentIndex];
+    const keyInfo = getKeyInfo(expectedChar, text, currentIndex);
+
+    // Process the key press
+    const matchedKey = processKeyPress(e.key, expectedChar, keyInfo, e);
+    
+    if (matchedKey === null) {
+      // Wrong key
+      handleKeyPress(e.key, expectedChar);
+    } else {
+      // Correct key
+      handleKeyPress(matchedKey, expectedChar);
+    }
   };
 
   const handleFocus = () => {
@@ -340,7 +375,7 @@ export default function TypingPage() {
           </div>
 
           {/* Virtual Keyboard at the bottom */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 mt-12">
             <VirtualKeyboard />
           </div>
         </div>
