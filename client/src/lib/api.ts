@@ -159,25 +159,64 @@ export async function saveBook(book: BookData): Promise<{ bookId: string; title:
   return await response.json();
 }
 
-export async function getBook(bookId: string): Promise<BookData | null> {
+export async function getBook(bookId: string, retryCount = 0): Promise<BookData | null> {
   const token = getAuthToken();
-  if (!token) return null;
+  console.log('[DEBUG] getBook called:', { bookId, hasToken: !!token, API_BASE, retryCount });
+  
+  if (!token) {
+    console.log('[DEBUG] getBook: No auth token, returning null');
+    return null;
+  }
 
   try {
-    const response = await fetch(`${API_BASE}/book/${bookId}`, {
+    const url = `${API_BASE}/book/${bookId}`;
+    console.log('[DEBUG] getBook: Fetching from:', url);
+    
+    const response = await fetch(url, {
       headers: getHeaders(),
     });
 
+    console.log('[DEBUG] getBook: Response status:', response.status);
+
     if (response.status === 404) {
+      console.log('[DEBUG] getBook: Book not found (404)');
       return null;
     }
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch book');
+    // Handle rate limiting with retry
+    if (response.status === 429) {
+      if (retryCount < 3) {
+        const retryAfter = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5s
+        console.log(`[DEBUG] getBook: Rate limited (429), retrying after ${retryAfter}ms (attempt ${retryCount + 1}/3)`);
+        await new Promise(resolve => setTimeout(resolve, retryAfter));
+        return getBook(bookId, retryCount + 1);
+      } else {
+        console.error('[DEBUG] getBook: Rate limited (429), max retries reached');
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
     }
 
-    return await response.json();
-  } catch {
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[DEBUG] getBook: Error response:', { status: response.status, error: errorText });
+      throw new Error(`Failed to fetch book: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('[DEBUG] getBook: Success, book data:', { 
+      bookId: data.bookId, 
+      title: data.title, 
+      hasText: !!data.text, 
+      textLength: data.text?.length 
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('[DEBUG] getBook: Exception caught:', error);
+    // Don't return null on rate limit errors, throw them so they can be handled
+    if (error instanceof Error && error.message.includes('Too many requests')) {
+      throw error;
+    }
     return null;
   }
 }

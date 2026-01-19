@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTypingStore } from '@/store/useTypingStore';
 import { getLocalProgress, saveLocalProgress } from '@/lib/storage';
@@ -32,6 +32,7 @@ export default function TypingPage() {
   const [isFocused, setIsFocused] = useState(false);
   const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
   const [fontSize, setFontSize] = useState(1);
+  const loadingRef = useRef(false);
 
   const syncWithRemote = async (bookId: string) => {
     try {
@@ -61,7 +62,9 @@ export default function TypingPage() {
 
   // Load book data on mount
   useEffect(() => {
-    if (!bookId || storeBookId === bookId) return;
+    if (!bookId || storeBookId === bookId || loadingRef.current) return;
+    
+    loadingRef.current = true;
 
     const loadBookData = async () => {
       const localProgress = getLocalProgress(bookId);
@@ -70,23 +73,44 @@ export default function TypingPage() {
       let bookText: string | null = null;
       let bookTitle = 'Book';
       
+      console.log('[DEBUG] Loading book:', { bookId, isAuthenticated });
+      
       if (isAuthenticated) {
         try {
+          console.log('[DEBUG] Attempting to fetch book from server...');
           const book = await getBook(bookId);
+          console.log('[DEBUG] Book fetch result:', { 
+            found: !!book, 
+            hasText: !!book?.text, 
+            textLength: book?.text?.length,
+            title: book?.title 
+          });
           if (book) {
             bookText = book.text;
             bookTitle = book.title;
+            console.log('[DEBUG] Book loaded successfully from MongoDB');
+          } else {
+            console.log('[DEBUG] Book not found in MongoDB (returned null)');
           }
-        } catch (error) {
-          console.error('Failed to load book from server:', error);
+        } catch (error: any) {
+          console.error('[DEBUG] Failed to load book from server:', error);
+          // If it's a rate limit error, show a helpful message
+          if (error?.message?.includes('Too many requests')) {
+            console.warn('[DEBUG] Rate limited, will retry automatically or use sessionStorage fallback');
+          }
         }
+      } else {
+        console.log('[DEBUG] Not authenticated, skipping MongoDB fetch');
       }
       
       // Fallback to sessionStorage if not found in MongoDB
       if (!bookText) {
+        console.log('[DEBUG] Book text not found in MongoDB, checking sessionStorage...');
         const cachedText = sessionStorage.getItem(`book_text_${bookId}`);
+        console.log('[DEBUG] SessionStorage result:', { found: !!cachedText, length: cachedText?.length });
         if (cachedText) {
           bookText = cachedText;
+          console.log('[DEBUG] Book loaded from sessionStorage');
         }
       }
       
@@ -113,7 +137,9 @@ export default function TypingPage() {
       }
     };
 
-    loadBookData();
+    loadBookData().finally(() => {
+      loadingRef.current = false;
+    });
   }, [bookId, storeBookId, loadBook, isAuthenticated, navigate]);
 
   // Auto-save progress
@@ -144,7 +170,7 @@ export default function TypingPage() {
     }, 5000); // 5 second debounce
 
     setAutoSaveTimer(timer);
-  }, [autoSaveTimer, storeBookId, text, title, positionIndex, stats, saveStoreProgress, isAuthenticated]);
+  }, [storeBookId, text, title, positionIndex, stats, saveStoreProgress, isAuthenticated]);
 
   useEffect(() => {
     if (isFocused && positionIndex > 0) {
@@ -246,34 +272,96 @@ export default function TypingPage() {
       return;
     }
 
-    // Auto-advance on newlines: accept any key (except Backspace) to skip newline
-    // But only advance newlines - spaces and other characters must be typed normally
+    // Handle newlines: if followed by letter, treat as space; otherwise skip multiple newlines
     let currentIndex = positionIndex;
+    console.log('[DEBUG] handleKeyDown - Start:', {
+      positionIndex,
+      currentChar: text[positionIndex],
+      charCode: text[positionIndex]?.charCodeAt(0),
+      nextChars: text.substring(positionIndex, positionIndex + 10).split('').map((c, i) => ({
+        index: positionIndex + i,
+        char: c === '\n' ? '\\n' : c === ' ' ? '[SPACE]' : c,
+        charCode: c.charCodeAt(0)
+      })),
+      pressedKey: e.key
+    });
+
+    // Skip multiple consecutive newlines (but not the first one if followed by letter)
     while (currentIndex < text.length && text[currentIndex] === '\n') {
-      // Mark newline as correct and advance automatically
-      handleKeyPress('\n', '\n');
-      // Get the updated position from store after advancing
-      currentIndex = useTypingStore.getState().positionIndex;
-      if (currentIndex >= text.length) return;
+      // Check if this newline is followed by a letter (needs space)
+      const nextCharIndex = currentIndex + 1;
+      let foundNonNewline = false;
+      for (let i = nextCharIndex; i < text.length; i++) {
+        if (text[i] !== '\n') {
+          foundNonNewline = true;
+          // If followed by letter, treat as space - don't skip
+          if (/[a-zA-Z]/.test(text[i])) {
+            console.log('[DEBUG] Newline at', currentIndex, 'followed by letter, treating as space');
+            break; // Don't skip, treat as space
+          }
+          // If followed by non-letter, skip this newline
+          console.log('[DEBUG] Auto-advancing newline at index:', currentIndex, '(not followed by letter)');
+          handleKeyPress('\n', '\n');
+          currentIndex = useTypingStore.getState().positionIndex;
+          if (currentIndex >= text.length) return;
+          break;
+        }
+      }
+      if (!foundNonNewline) {
+        // Only newlines remaining, skip them
+        console.log('[DEBUG] Auto-advancing newline at index:', currentIndex, '(only newlines remaining)');
+        handleKeyPress('\n', '\n');
+        currentIndex = useTypingStore.getState().positionIndex;
+        if (currentIndex >= text.length) return;
+      } else if (/[a-zA-Z]/.test(text[currentIndex + 1] || '')) {
+        // Newline followed by letter - treat as space, don't skip
+        break;
+      }
     }
 
-    // After advancing newlines, get the actual character at the current position
-    // This could be a space, letter, or any other character - it must be typed
-    // Use the most up-to-date position from store to ensure synchronization
-    const finalPositionIndex = useTypingStore.getState().positionIndex;
-    const expectedChar = text[finalPositionIndex];
-    
-    // Get key info for the expected character (this will correctly handle spaces)
-    const keyInfo = getKeyInfo(expectedChar, text, finalPositionIndex);
+    const expectedChar = text[currentIndex];
+    console.log('[DEBUG] Expected char after newline handling:', {
+      currentIndex,
+      expectedChar: expectedChar === '\n' ? '\\n' : expectedChar === ' ' ? '[SPACE]' : expectedChar,
+      charCode: expectedChar?.charCodeAt(0),
+      pressedKey: e.key
+    });
 
-    // Process the key press for the expected character
+    // Special handling: if expectedChar is \n followed by letter, treat as space
+    if (expectedChar === '\n' && currentIndex + 1 < text.length) {
+      let nextCharIndex = currentIndex + 1;
+      while (nextCharIndex < text.length && text[nextCharIndex] === '\n') {
+        nextCharIndex++;
+      }
+      if (nextCharIndex < text.length && /[a-zA-Z]/.test(text[nextCharIndex])) {
+        // Newline followed by letter - treat as space
+        console.log('[DEBUG] Newline followed by letter, treating as space');
+        if (e.key === ' ') {
+          // User pressed space - mark newline as correct and advance
+          handleKeyPress('\n', '\n');
+          return;
+        } else {
+          // User pressed wrong key - mark as incorrect
+          handleKeyPress(e.key, '\n');
+          return;
+        }
+      }
+    }
+
+    const keyInfo = getKeyInfo(expectedChar, text, currentIndex);
+    console.log('[DEBUG] KeyInfo:', keyInfo);
+
+    // Process the key press
     const matchedKey = processKeyPress(e.key, expectedChar, keyInfo, e);
+    console.log('[DEBUG] Matched key:', matchedKey);
     
     if (matchedKey === null) {
       // Wrong key
+      console.log('[DEBUG] Key mismatch - marking as incorrect');
       handleKeyPress(e.key, expectedChar);
     } else {
       // Correct key
+      console.log('[DEBUG] Key match - marking as correct');
       handleKeyPress(matchedKey, expectedChar);
     }
   };

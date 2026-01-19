@@ -15,7 +15,23 @@ export default function VirtualKeyboard() {
 
   const nextKeyInfo = useMemo(() => {
     if (positionIndex >= text.length) return null;
-    return getKeyInfo(text[positionIndex], text, positionIndex);
+    const currentChar = text[positionIndex];
+    const nextChars = text.substring(positionIndex, Math.min(positionIndex + 10, text.length)).split('').map((c, i) => ({
+      index: positionIndex + i,
+      char: c === '\n' ? '\\n' : c === ' ' ? '[SPACE]' : c,
+      charCode: c.charCodeAt(0)
+    }));
+    // Log nextChars in a more readable format
+    const nextCharsReadable = nextChars.map(c => `${c.index}:${c.char}(${c.charCode})`).join(' ');
+    console.log('[DEBUG] VirtualKeyboard - Getting key info:', {
+      positionIndex,
+      currentChar: currentChar === '\n' ? '\\n' : currentChar === ' ' ? '[SPACE]' : currentChar,
+      currentCharCode: currentChar.charCodeAt(0),
+      nextCharsReadable
+    });
+    const result = getKeyInfo(currentChar, text, positionIndex);
+    console.log('[DEBUG] VirtualKeyboard - KeyInfo result:', result);
+    return result;
   }, [text, positionIndex]);
 
   const highlightedKey = nextKeyInfo?.key.toLowerCase();
